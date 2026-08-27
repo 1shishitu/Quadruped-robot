@@ -1,0 +1,73 @@
+# 机器人 kinematic / dynamic 参数（需与 URDF 一致）
+robot:
+  name: unitree_go1  # unitree_a1 | unitree_go1 | custom
+  urdf_path: assets/urdf/go1_description/urdf/go1_mujoco.urdf
+
+  # 默认站立（Tachi）；Go1 URDF 左右 hip 镜像：FL/RL 为正、FR/RR 为负（对称站）
+  default_height: 0.28        # m, CoM 或 base 高度
+  default_joint_angles:       # rad, [hip, thigh, calf] per leg（hip 左右符号相反）
+    FL: [0.27, 0.8, -1.6]
+    FR: [-0.27, 0.8, -1.6]
+    RL: [0.27, 0.8, -1.6]
+    RR: [-0.27, 0.8, -1.6]
+  # hip_mirror_sign: {FL: 1, FR: -1, RL: 1, RR: -1}  # 标定脚本默认，可省略
+
+  # 单刚体模型近似（MPC 用）
+  mass: 12.0                  # kg, Go1 实机约 12；URDF 合计约 13.1
+  gravity: 9.81               # m/s^2, 环境重力（非 Go1 专属）
+  sim_dt: 0.002               # s, MuJoCo 控制/物理步长（500 Hz，对齐 Go1 low-level）
+
+  # 仿真时序：500 Hz 控制环与显示/打印解耦（同真机：控制定时，画面另路）
+  sim_timing:
+    control_rate_hz: 500.0     # 控制频率 [Hz]，应 ≈ 1/sim_dt
+    viewer_rate_hz: 30.0       # MuJoCo 画面刷新上限 [Hz]（OpenGL 会用独显）
+    print_rate_hz: 0.25          # 终端状态打印 [Hz]（按墙上时钟节流）
+    plot_rate_hz: 20.0          # plot_stand_debug 曲线刷新 [Hz]
+    realtime_scale: 1         # 1=仿真秒对齐墙上时钟；2=两倍速；0=尽快跑
+    max_steps_per_frame: 100    # 单帧最多补步（原 500 易卡顿尖峰）
+
+  # Viewer 手动扰动（Simulate 同款：Ctrl+拖拽对选中 body 施加外力）
+  sim_perturb:
+    enabled: true
+    default_body: trunk          # 启动时选中 trunk，可直接 Ctrl+拖拽
+
+  # IMU roll/pitch 外环 + 站起轨迹门控（Phase 1.5 抗干扰）
+  attitude_assist:
+    enabled: true
+    kp: [0.6, 0.6]              # roll, pitch [rad/rad]
+    kd: [0.04, 0.04]            # roll, pitch [rad/(rad/s)]
+    max_correction: 0.3         # rad, 单关节修正上限
+    gate_tilt: 0.26              # rad (~15°), 超过则暂停 Fuse→Tachi 插值
+    release_tilt: 0.15           # rad (~8.6°), 回正后恢复插值（滞回）
+    require_all_feet: true
+    min_feet: 4
+    pitch_coupling: {hip: 0.2, thigh: 0.8, calf: 0.0}
+    roll_coupling:  {hip: 0.6, thigh: 0.3, calf: 0.0}
+    phase_scale: {fuse: 0.6, tachi: 0.85, hold: 1.0}
+
+  # Unitree low-level stand-up：init→Fuse→Tachi + 关节 PD + 可选重力前馈
+  stand_joint:
+    kp: [200.0, 200.0, 200.0]      # example_position / SDK 教程 P_STIFF
+    kd: [1.0, 1.0, 1.0]         # example_position.cpp
+    stand_poses:                # [hip, thigh, calf] per leg（SDK 教程常数）
+      fuse: [-0.02, 1.3, -2.8]
+    stand_up_phase_duration: 2.0  # s, Fuse 与 Tachi 各一段（线性插值）
+    reset_joint_angles: [0.0, 0.0, 0.0]  # MuJoCo spawn；通电后从当前 q 站起（同 SDK）
+    power_off_duration: 0.0       # >0 则自动通电；0 = 仅用手动开关
+    power_key: "9"                 # 勿用 P（MuJoCo viewer = Contact Split 可视化）
+    reset_key: HOME                # 勿用 R（viewer = Reflection）；Backspace 也会 reset 仿真
+    gravity_compensation: true  # true: τ += qfrc_bias；false: 纯 PD（无模型前馈）
+
+  # 关节限位与力矩（与 go1_description/xacro/const.xacro、URDF 一致）
+  joint_limits:
+    hip:   [-0.863, 0.863]
+    thigh: [-0.686, 4.501]
+    calf:  [-2.818, -0.888]
+  torque_limits: [23.7, 23.7, 35.55]  # N·m, [hip, thigh, calf] per leg
+
+  # 足端 / 摩擦
+  foot_radius: 0.02           # m
+  friction_coeff: 0.5
+
+  leg_names: [FL, FR, RL, RR]
+  joint_suffix: [hip, thigh, calf]

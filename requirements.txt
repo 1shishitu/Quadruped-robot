@@ -1,0 +1,15 @@
+numpy>=1.24
+scipy>=1.10
+pyyaml>=6.0
+pytest>=7.0
+
+# mesh 转换 (scripts/dae_to_stl.py)
+# trimesh>=4.0
+# pycollada>=0.8
+# fast-simplification>=0.1   # trunk 等超大 mesh 降面
+
+# Phase 0+ — 按需取消注释
+# pinocchio>=3.0
+# mujoco>=3.0
+# osqp>=0.6
+# meshcat

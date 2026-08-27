@@ -1,0 +1,20 @@
+# 原地踏步 trot — 落足回到进入时的 stance 锚点，无 Raibert 前移
+gait:
+  name: march_in_place
+  frequency: 0.5              # Hz，慢 trot 便于 2 足支撑
+  swing_ratio: 0.3            # 70% stance
+
+  phase_offset:
+    FL: 0.0
+    FR: 0.5
+    RL: 0.5
+    RR: 0.0
+
+  foot:
+    clearance: 0.03           # m
+    stance_height: 0.0
+    placement: in_place       # in_place | raibert
+
+  raibert:
+    kv: 0.0
+    kp: 0.0

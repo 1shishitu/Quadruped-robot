@@ -1,0 +1,23 @@
+# SRBM-MPC 参数
+mpc:
+  horizon: 15                 # 预测步数 N
+  dt: 0.02                    # s, 离散化时间步
+
+  # 状态权重 Q (p_com, v_com, rpy, omega, g_placeholder)
+  weights:
+    position: [50.0, 50.0, 100.0]
+    velocity: [10.0, 10.0, 10.0]
+    orientation: [30.0, 30.0, 10.0]
+    angular_velocity: [5.0, 5.0, 5.0]
+
+  # 控制权重 R (per contact force component)
+  control_weight: 1.0e-4
+
+  # 约束
+  friction_coeff: 0.5
+  force_max: 200.0            # N, 单足最大法向力
+  force_min_z: 0.0            # N
+
+  # 求解器
+  solver: osqp                # osqp | qpoases
+  warm_start: true
