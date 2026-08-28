@@ -1,12 +1,14 @@
-# Walk / 原地踏步 — unitree_guide（quintic + IK swing + Balance QP）
+# 运动控制全局配置 — unitree_guide 管线
 #
-# mode: march_in_place — 按 8 进入后原地 trot，落足=stance 锚点，v_cmd 恒 0
-# gait_config: 短名 march | trot → config/gait_config/*.yaml
+# 步态/控制器专用参数 → config/gait_config/<name>.yaml 的 control:
+#   fl_lift.yaml  — 单腿抬升
+#   march.yaml    — 原地踏步 (mode: march_in_place)
+#   trot.yaml     — 行走 (mode: walk)
 #
 locomotion:
   enabled: true
-  mode: march_in_place
-  gait_config: march           # → config/gait_config/march.yaml
+  mode: fl_lift               # fl_lift | march_in_place | walk
+  gait_config: fl_lift         # → config/gait_config/*.yaml
   toggle_key: "8"
   stop_key: END
 
@@ -22,14 +24,15 @@ locomotion:
   max_vy: 0.15
   max_omega: 0.6
 
-  cmd_vx: 0.15                 # 按住方向键时的目标巡航速度（匀速，非瞬间顶满 max）
+  cmd_vx: 0.15                 # 按住方向键时的目标巡航速度
   cmd_vy: 0.10
   cmd_omega: 0.35
 
   smoothing_tau: 0.12           # 加减速时间常数 [s]
-  key_mode: remote              # 方向键设速，End 停；MuJoCo 无 key-up，见 keyboard_cmd 注释
+  key_mode: remote
   key_hold_timeout: 0.12        # 仅 key_mode: repeat 时使用
 
+  # Balance 默认 trunk PD（各步态可在 gait control.trunk 覆盖）
   trunk:
     default_height: 0.28
     preview_horizon: 0.06
@@ -41,25 +44,18 @@ locomotion:
   balance:
     include_gravity: true
     v_cmd_deadband: 0.04
-    friction_coeff: 0.4          # unitree_guide BalanceCtrl
+    friction_coeff: 0.4
     com_offset: [0.0, 0.0, 0.0]
     alpha: 0.001
     beta: 0.1
-    # Soft wrench tracking S = diag(...); higher roll/pitch weight for 2-stance trot
     weight_wrench: [20.0, 20.0, 50.0, 450.0, 450.0, 450.0]
-    weight_force: [10.0, 10.0, 4.0]    # per foot axis, tiled ×4
+    weight_force: [10.0, 10.0, 4.0]
     weight_smooth: [3.0, 3.0, 3.0]
-    inertia: [0.0792, 0.2085, 0.2265]  # body frame, τ = R I Rᵀ α
+    inertia: [0.0792, 0.2085, 0.2265]
 
   wbc:
-    # Stance: Balance GRF → −JᵀF；Swing: quintic 足端 → LegIK → 关节 PD（见 swing_joint）
-    joint_kd: [2.0, 2.0, 2.0]  # 全腿阻尼；walk 支撑腿 Kp=0
-    gravity_compensation: true   # τ_g = qfrc_bias
-
-  # unitree_guide 摆腿：FootPlanner quintic → IK → 关节阻抗
-  swing_joint:
-    kp: [60.0, 80.0, 80.0]       # hip, thigh, calf（仅 swing 腿）
-    kd: [2.0, 2.0, 2.0]
+    joint_kd: [2.0, 2.0, 2.0]
+    gravity_compensation: true
 
   swing_ik:
     max_iters: 12
@@ -70,18 +66,3 @@ locomotion:
     enabled: true
     show_swing_path: true
     show_raibert: true
-
-  # 原地踏步专用（2 足支撑 + 摆腿 IK 易失稳 → stance 腿关节保持 + 更强 Balance）
-  march:
-    use_balance: false
-    trunk:
-      kp_pos: [40.0, 40.0, 120.0]
-      kd_pos: [12.0, 12.0, 14.0]
-      kp_rpy: [120.0, 120.0, 30.0]
-      kd_rpy: [14.0, 14.0, 6.0]
-    stance_joint:
-      kp: [200.0, 200.0, 200.0]
-      kd: [1.0, 1.0, 1.0]
-    swing_joint:
-      kp: [40.0, 90.0, 110.0]
-      kd: [2.5, 4.0, 5.0]

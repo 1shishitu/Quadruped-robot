@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from quadruped.config_loader import load_gait_config_for_locomotion, load_locomotion_config
-from quadruped.controllers.gait_controller import LocomotionController
+from quadruped.controllers.gait_controller import FlLiftController, LocomotionController
 from quadruped.controllers.low_level import (
     AttitudeStandAssist,
     BalanceController,
@@ -24,6 +24,7 @@ from quadruped.controllers.stand.stand_up import (
 )
 from quadruped.input.keyboard_cmd import LocomotionKeyboard
 from quadruped.input.mujoco_keys import key_matches, parse_key
+from quadruped.planners.fl_lift_planner import FlLiftPlanner
 from quadruped.planners.foot_planner import FootPlanner
 from quadruped.planners.gait_scheduler import GaitScheduler
 from quadruped.planners.trunk_planner import TrunkPlanner
@@ -123,7 +124,6 @@ class MuJoCoEnv:
         self._loco_toggle_name = str(self._loco_yaml.get("toggle_key", "8"))
         self._loco_toggle_keycode = parse_key(self._loco_toggle_name)
 
-        self.gait = GaitScheduler.from_config(gait_full)
         height = float(
             self._loco_yaml.get("trunk", {}).get("default_height", robot_cfg.get("default_height", 0.28))
         )
@@ -132,18 +132,41 @@ class MuJoCoEnv:
             gravity=float(robot_cfg.get("gravity", 9.81)),
         )
         self.trunk_planner.preview_horizon = preview
-        self.foot_planner = FootPlanner.from_config(gait_full, self.gait)
         self.balance = BalanceController.from_config(loco_full, robot_cfg)
         self.wbc = WBCController.from_config(loco_full)
-        self.locomotion = LocomotionController.from_config(
-            robot_cfg,
-            loco_full,
-            balance=self.balance,
-            wbc=self.wbc,
-            foot_planner=self.foot_planner,
-            trunk_planner=self.trunk_planner,
-            attitude=self.attitude,
-        )
+
+        self._use_fl_lift = self._loco_mode == "fl_lift"
+
+        if self._use_fl_lift:
+            self.fl_lift_planner = FlLiftPlanner.from_config(gait_full, robot_cfg)
+            self.fl_lift = FlLiftController.from_config(
+                robot_cfg,
+                loco_full,
+                gait_full,
+                planner=self.fl_lift_planner,
+                balance=self.balance,
+                wbc=self.wbc,
+                trunk_planner=self.trunk_planner,
+                attitude=self.attitude,
+            )
+            self.gait = None
+            self.foot_planner = None
+            self.locomotion = None
+        else:
+            self.gait = GaitScheduler.from_config(gait_full)
+            self.foot_planner = FootPlanner.from_config(gait_full, self.gait)
+            self.fl_lift_planner = None
+            self.fl_lift = None
+            self.locomotion = LocomotionController.from_config(
+                robot_cfg,
+                loco_full,
+                gait_full,
+                balance=self.balance,
+                wbc=self.wbc,
+                foot_planner=self.foot_planner,
+                trunk_planner=self.trunk_planner,
+                attitude=self.attitude,
+            )
         self.keyboard = LocomotionKeyboard(loco_full)
 
         self._mode = "stand"
@@ -257,27 +280,43 @@ class MuJoCoEnv:
         state = read_joint_state(self.model, self.data, self.robot_cfg, t=self._t)
         height = float(state.base_pos[2])
         self.trunk_planner.default_height = height
-        self.trunk_planner.preview_horizon = 0.0 if self._loco_mode == "march_in_place" else float(
+        self.trunk_planner.preview_horizon = 0.0 if self._loco_mode in (
+            "march_in_place",
+            "fl_lift",
+        ) else float(
             self._loco_yaml.get("trunk", {}).get("preview_horizon", 0.08)
         )
         self.trunk_planner.reset(
             p_com=np.array([state.base_pos[0], state.base_pos[1], height]),
             yaw=float(state.base_rpy[2]),
         )
-        self.foot_planner.set_stance_positions(
-            read_foot_positions(self.model, self.data, self.robot_cfg),
-            base_pos=state.base_pos,
-            base_rpy=state.base_rpy,
-            yaw=float(state.base_rpy[2]),
-        )
+        foot_pos = read_foot_positions(self.model, self.data, self.robot_cfg)
+        if self._loco_mode == "fl_lift":
+            self.fl_lift.begin(state, foot_pos)
+        else:
+            self.foot_planner.set_stance_positions(
+                foot_pos,
+                base_pos=state.base_pos,
+                base_rpy=state.base_rpy,
+                yaw=float(state.base_rpy[2]),
+            )
+            if self._loco_mode == "march_in_place":
+                self.locomotion.begin_march(state)
         self.balance.reset()
-        if self._loco_mode == "march_in_place":
-            self.locomotion.begin_march(state)
         self._loco_start_t = self._t
         self.keyboard.reset()
         self._mode = "locomote"
-        if self._loco_mode == "march_in_place":
-            print(f"[t={self._t:.2f}s] 原地踏步 ON — trot {self.gait.frequency:.1f}Hz，落足=body 锚点；再按 [{self._loco_toggle_name}] 退出")
+        if self._loco_mode == "fl_lift":
+            p = self.fl_lift_planner.period
+            print(
+                f"[t={self._t:.2f}s] FL 抬腿测试 ON — "
+                f"竖直抬→定→放 周期 {p:.1f}s；再按 [{self._loco_toggle_name}] 退出"
+            )
+        elif self._loco_mode == "march_in_place":
+            print(
+                f"[t={self._t:.2f}s] 原地踏步 ON — trot {self.gait.frequency:.1f}Hz；"
+                f"再按 [{self._loco_toggle_name}] 退出"
+            )
         else:
             print(f"[t={self._t:.2f}s] 行走模式 ON — 方向键巡航, Insert/Delete 偏航, End 停止")
         return True
@@ -380,6 +419,24 @@ class MuJoCoEnv:
         return tau
 
     def _apply_locomotion_control(self) -> np.ndarray:
+        gait_t = self._t - self._loco_start_t
+        state = read_joint_state(
+            self.model,
+            self.data,
+            self.robot_cfg,
+            t=self._t,
+            include_contact=True,
+        )
+
+        if self._loco_mode == "fl_lift":
+            self._stand_phase = "fl_lift"
+            self._v_cmd_display[:] = 0.0
+            tau = self.fl_lift.compute(
+                self.model, self.data, state, gait_t=gait_t, dt=self.dt
+            )
+            apply_joint_torques(self.model, self.data, tau, self._act_ids)
+            return tau
+
         if self._loco_mode == "march_in_place":
             v_cmd = np.zeros(3, dtype=float)
             omega_cmd = 0.0
@@ -387,17 +444,8 @@ class MuJoCoEnv:
             v_cmd, omega_cmd = self.keyboard.update(time.perf_counter(), self.dt)
         self._v_cmd_display = np.asarray(v_cmd, dtype=float).copy()
         self._omega_cmd_display = float(omega_cmd)
-        gait_t = self._t - self._loco_start_t
         self._stand_phase = (
             "march" if self._loco_mode == "march_in_place" else "walk"
-        )
-
-        state = read_joint_state(
-            self.model,
-            self.data,
-            self.robot_cfg,
-            t=self._t,
-            include_contact=True,
         )
         tau = self.locomotion.compute(
             self.model,
@@ -521,14 +569,18 @@ class MuJoCoEnv:
 
         status = "ON  (stand)" if self.powered else "OFF (limp, tau=0)"
         if self.powered and self._mode == "locomote":
-            if self._loco_mode == "march_in_place":
+            if self._loco_mode == "fl_lift":
+                status = "ON  (FL lift)"
+            elif self._loco_mode == "march_in_place":
                 status = "ON  (march)"
             else:
                 status = "ON  (walk)"
         grav = "on" if self._gravity_compensation else "off"
         phase = self._stand_phase if self.powered else "collapsed"
         if self._mode == "locomote":
-            if self._loco_mode == "march_in_place":
+            if self._loco_mode == "fl_lift":
+                phase = "FL lift"
+            elif self._loco_mode == "march_in_place":
                 phase = "march trot"
             else:
                 phase = f"walk v=({self._v_cmd_display[0]:+.2f},{self._v_cmd_display[1]:+.2f})"
@@ -544,10 +596,14 @@ class MuJoCoEnv:
         top_right_sub = f"FF:{grav} {imu_hint}"
         if self._mode == "locomote" and self._foot_debug_viz:
             top_right_sub = "Y=touchdown  color=leg  white=ref  black=foot"
-        march_hint = (
-            "march: trot in place"
-            if self._loco_mode == "march_in_place"
-            else "arrows=move End=stop"
+        loco_hint = (
+            "FL lift test"
+            if self._loco_mode == "fl_lift"
+            else (
+                "march: trot in place"
+                if self._loco_mode == "march_in_place"
+                else "arrows=move End=stop"
+            )
         )
         viewer.set_texts([
             (None, mujoco.mjtGridPos.mjGRID_TOPLEFT, "Motor", status),
@@ -556,7 +612,7 @@ class MuJoCoEnv:
                 None,
                 mujoco.mjtGridPos.mjGRID_BOTTOMLEFT,
                 f"[{self._power_key_name}] power  [{self._reset_key_name}] reset",
-                f"[{self._loco_toggle_name}] march/walk  {march_hint}",
+                f"[{self._loco_toggle_name}] gait test  {loco_hint}",
             ),
             (
                 None,
@@ -567,9 +623,14 @@ class MuJoCoEnv:
         ])
         if self._mode == "locomote" and self._foot_debug_viz and self._model is not None:
             foot_pos = read_foot_positions(self.model, self.data, self.robot_cfg)
+            dbg = (
+                self.fl_lift_planner.debug
+                if self._use_fl_lift
+                else self.foot_planner.debug
+            )
             draw_foot_planner_debug(
                 viewer,
-                self.foot_planner.debug,
+                dbg,
                 foot_pos,
                 enabled=True,
                 show_swing_path=self._foot_debug_show_path,
@@ -628,7 +689,11 @@ class MuJoCoEnv:
             f"[{self._reset_key_name}] 重置"
         )
         if self._loco_enabled:
-            if self._loco_mode == "march_in_place":
+            if self._loco_mode == "fl_lift":
+                print(
+                    f"      [{self._loco_toggle_name}] stand↔FL 抬腿测试 (竖直抬→定→放)"
+                )
+            elif self._loco_mode == "march_in_place":
                 print(
                     f"      [{self._loco_toggle_name}] stand↔原地踏步 (trot 1Hz，落足=stance 锚点)"
                 )

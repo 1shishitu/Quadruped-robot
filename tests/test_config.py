@@ -34,7 +34,16 @@ class TestConfigLoader:
         cfg = load_mpc_config()
         assert cfg["mpc"]["horizon"] > 0
 
+    def test_gait_control_blocks(self):
+        for name in ("fl_lift", "march", "trot"):
+            cfg = load_gait_config(name)
+            assert "control" in cfg, name
+            assert cfg["control"], name
+
     def test_locomotion_config(self):
         cfg = load_locomotion_config()
-        assert cfg["locomotion"]["max_vx"] > 0
-        assert cfg["locomotion"].get("mode") == "march_in_place"
+        loco = cfg["locomotion"]
+        assert loco["max_vx"] > 0
+        assert loco.get("mode") == "fl_lift"
+        assert "march" not in loco
+        assert "swing_joint" not in loco

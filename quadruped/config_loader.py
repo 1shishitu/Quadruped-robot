@@ -17,6 +17,7 @@ _GAIT_ALIASES: dict[str, str] = {
     "march_in_place": "march.yaml",
     "trot": "trot.yaml",
     "walk": "trot.yaml",
+    "fl_lift": "fl_lift.yaml",
     # legacy flat names (config/gait_*.yaml removed)
     "gait_march.yaml": "march.yaml",
     "gait_trot.yaml": "trot.yaml",
@@ -58,6 +59,11 @@ def resolve_gait_config_path(name: str) -> Path:
 def load_gait_config(name: str = "trot") -> dict:
     """Load gait YAML from ``config/gait_config/``."""
     return load_yaml(resolve_gait_config_path(name))
+
+
+def gait_control_block(gait_cfg: dict) -> dict:
+    """Per-gait controller overrides (``control:`` section in gait YAML)."""
+    return dict(gait_cfg.get("control") or {})
 
 
 def load_gait_config_for_locomotion(loco_cfg: dict | None = None) -> dict:

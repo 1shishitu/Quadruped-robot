@@ -89,6 +89,7 @@ class TestLocomotionStability:
         loco = LocomotionController.from_config(
             cfg,
             loco_yaml,
+            gait_cfg,
             balance=BalanceController.from_config(loco_yaml, cfg),
             wbc=WBCController.from_config(loco_yaml),
             foot_planner=fp,

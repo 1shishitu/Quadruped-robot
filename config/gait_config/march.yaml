@@ -18,3 +18,18 @@ gait:
   raibert:
     kv: 0.0
     kp: 0.0
+
+# LocomotionController（march_in_place）；共享 balance/wbc 见 locomotion.yaml
+control:
+  use_balance: false
+  trunk:
+    kp_pos: [40.0, 40.0, 120.0]
+    kd_pos: [12.0, 12.0, 14.0]
+    kp_rpy: [120.0, 120.0, 30.0]
+    kd_rpy: [14.0, 14.0, 6.0]
+  stance_joint:
+    kp: [200.0, 200.0, 200.0]
+    kd: [1.0, 1.0, 1.0]
+  swing_joint:
+    kp: [40.0, 90.0, 110.0]
+    kd: [2.5, 4.0, 5.0]

@@ -16,6 +16,7 @@ from quadruped.controllers.low_level.balance_controller import BalanceController
 from quadruped.controllers.low_level.joint_controller import JointController
 from quadruped.controllers.low_level.wbc_controller import WBCController
 from quadruped.models.leg_ik import LegIK
+from quadruped.config_loader import gait_control_block
 from quadruped.planners.foot_planner import FootPlanner
 from quadruped.planners.trunk_planner import TrunkPlanner
 from quadruped.sim.mujoco_robot import (
@@ -251,6 +252,7 @@ class LocomotionController:
         cls,
         robot_cfg: dict,
         loco_cfg: dict,
+        gait_cfg: dict,
         *,
         balance: BalanceController,
         wbc: WBCController,
@@ -260,7 +262,8 @@ class LocomotionController:
     ) -> LocomotionController:
         loco = loco_cfg.get("locomotion", loco_cfg)
         wbc_yaml = loco.get("wbc", {})
-        swing_joint = loco.get("swing_joint", {})
+        control = gait_control_block(gait_cfg)
+        swing = control.get("swing_joint", {})
         joint = JointController.from_robot_config({"robot": robot_cfg})
         leg_ik = LegIK.from_config({"robot": robot_cfg}, loco_cfg)
         inst = cls(
@@ -275,12 +278,12 @@ class LocomotionController:
             attitude=attitude,
         )
         inst._swing_kp = np.tile(
-            np.asarray(swing_joint.get("kp", [80.0, 100.0, 100.0]), dtype=float), 4
+            np.asarray(swing.get("kp", [80.0, 100.0, 100.0]), dtype=float), 4
         )
         inst._swing_kd = np.tile(
-            np.asarray(swing_joint.get("kd", [2.0, 2.0, 2.0]), dtype=float), 4
+            np.asarray(swing.get("kd", [2.0, 2.0, 2.0]), dtype=float), 4
         )
         mode = str(loco.get("mode", "march_in_place"))
         inst._march_in_place = mode == "march_in_place"
-        inst._march_cfg = loco.get("march", {})
+        inst._march_cfg = control if inst._march_in_place else {}
         return inst

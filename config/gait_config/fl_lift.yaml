@@ -1,0 +1,36 @@
+# 单腿测试：FL 竖直抬→定→放；其余三腿 Balance+WBC 力控
+gait:
+  name: fl_lift
+  frequency: 0.2             # Hz，周期 5s
+  swing_leg: FL
+
+  lift:
+    clearance: 0.15            # m；过大易倾翻
+    stance_ratio: 0.35
+    lift_ratio: 0.20
+    hold_ratio: 0.25
+    lower_ratio: 0.20
+
+  foot:
+    placement: fl_lift
+
+  swing_ratio: 0.5
+  phase_offset:
+    FL: 0.0
+    FR: 0.5
+    RL: 0.5
+    RR: 0.0
+
+# 控制器参数（FlLiftController）；共享项见 locomotion.yaml 的 balance / wbc
+control:
+  use_balance: true
+  trunk:
+    kp_pos: [40.0, 40.0, 120.0]
+    kd_pos: [12.0, 12.0, 14.0]
+    kp_rpy: [120.0, 120.0, 30.0]
+    kd_rpy: [14.0, 14.0, 5.0]
+  stance_joint:
+    kp: [0.0, 0.0, 0.0]
+  swing_joint:
+    kp: [40.0, 60.0, 60.0]
+    kd: [2.0, 3.0, 3.0]

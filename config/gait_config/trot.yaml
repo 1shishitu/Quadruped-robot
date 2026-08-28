@@ -1,23 +1,27 @@
-# Trot 步态参数
+# Trot 步态 — 行走（mode: walk）
 gait:
   name: trot
   frequency: 1.5              # Hz, 稍慢 trot 更易控（T=0.67s）
   swing_ratio: 0.5            # 摆动相占比, phi < swing_ratio → swing
 
-  # 每条腿相位偏移 (0~1)
   phase_offset:
     FL: 0.0
     FR: 0.5
     RL: 0.5
     RR: 0.0
 
-  # 足端轨迹
   foot:
     clearance: 0.08           # m, 摆动相最大抬脚高度
     stance_height: 0.0        # m, 相对地面（支撑相 z 偏移）
     placement: raibert          # walk 模式用
 
-  # Raibert 落足预览
   raibert:
     kv: 0.03                  # 落足预览（略保守）
     kp: 0.0                   # 位置反馈（可选）
+
+# LocomotionController（walk）；stance 力控 Kp=0，仅 swing 腿关节 PD
+control:
+  use_balance: true
+  swing_joint:
+    kp: [60.0, 80.0, 80.0]
+    kd: [2.0, 2.0, 2.0]

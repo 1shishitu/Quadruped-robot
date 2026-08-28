@@ -69,6 +69,13 @@ def march_sim():
     data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]
     _settle_standing(model, data, cfg, act_ids)
     loco_yaml = load_locomotion_config()
+    loco_yaml = {
+        "locomotion": {
+            **loco_yaml["locomotion"],
+            "mode": "march_in_place",
+            "gait_config": "march",
+        }
+    }
     gait_cfg = load_gait_config_for_locomotion(loco_yaml)
     gait = GaitScheduler.from_config(gait_cfg)
     fp = FootPlanner.from_config(gait_cfg, gait)
@@ -91,6 +98,7 @@ def march_sim():
     loco = LocomotionController.from_config(
         cfg,
         loco_yaml,
+        gait_cfg,
         balance=BalanceController.from_config(loco_yaml, cfg),
         wbc=WBCController.from_config(loco_yaml),
         foot_planner=fp,

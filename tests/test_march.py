@@ -33,5 +33,5 @@ class TestMarchInPlace:
 
     def test_locomotion_default_is_march(self):
         loco = load_locomotion_config()["locomotion"]
-        assert loco.get("mode") == "march_in_place"
-        assert loco.get("gait_config") == "march"
+        assert loco.get("mode") == "fl_lift"
+        assert loco.get("gait_config") == "fl_lift"

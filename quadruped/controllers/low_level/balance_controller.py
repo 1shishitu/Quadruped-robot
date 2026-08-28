@@ -96,6 +96,7 @@ class BalanceController:
         rpy_err = _angle_diff(ref.rpy, state.base_rpy)
         omega_err = ref.omega - state.base_omega
         d_omega = self.kp_rpy * rpy_err + self.kd_rpy * omega_err
+        d_omega = np.clip(d_omega, -80.0, 80.0)
 
         if self.include_gravity:
             f_des = self.mass * (dd_p + np.array([0.0, 0.0, self.gravity]))

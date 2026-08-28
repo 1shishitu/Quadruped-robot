@@ -1,6 +1,6 @@
 """Controllers — low_level (shared), stand, gait_controller."""
 
-from quadruped.controllers.gait_controller import LocomotionController, MPCController
+from quadruped.controllers.gait_controller import FlLiftController, LocomotionController, MPCController
 from quadruped.controllers.low_level import (
     AttitudeStandAssist,
     BalanceController,
@@ -13,6 +13,7 @@ __all__ = [
     "AttitudeStandAssist",
     "BalanceController",
     "JointController",
+    "FlLiftController",
     "LocomotionController",
     "MPCController",
     "StandController",

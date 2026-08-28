@@ -65,7 +65,15 @@ MuJoCo viewer 会占用大量单字母键（W=线框、S=阴影、A/D=可视化�
 | 4 | SRBM-MPC（替换 Balance QP） |
 | 5 | WBC（已实现基础版） |
 
-### 原地踏步（当前默认，`mode: march_in_place`）
+### FL 单腿抬升测试（当前默认 `mode: fl_lift`）
+
+```
+9 通电 → hold → 8：仅 FL 竖直抬起 → 空中定住 → 放下，4s 一周期；FR/RL/RR 站住
+```
+
+改回 march：`locomotion.yaml` → `mode: march_in_place` + `gait_config: march`
+
+### 原地踏步（`mode: march_in_place`）
 
 ```
 按 8（站稳 hold 后）→ 对角 trot @ 1Hz
@@ -91,10 +99,12 @@ Walk (500 Hz):
 
 | 文件 | 用途 |
 |------|------|
-| `march.yaml` | 原地踏步 trot，`placement: in_place` |
-| `trot.yaml` | 行走 trot，`placement: raibert` |
+| `fl_lift.yaml` | **当前默认** — FL 抬腿；`gait` + `control` |
+| `march.yaml` | 原地踏步；`control` 含 stance PD / trunk 增益 |
+| `trot.yaml` | 行走 trot；`control` 含 swing 关节 PD |
 
-`locomotion.yaml` 里 `gait_config: march` 或 `trot`（也支持 `gait_config/march.yaml`、旧名 `gait_march.yaml`）。
+各步态 YAML 结构：`gait:`（相位/足端）+ `control:`（该步态控制器增益）。  
+`locomotion.yaml` 只保留全局：键盘、`balance`、`wbc`、`trunk` 默认、切换 `mode` / `gait_config`。
 
 | 模块 | 作用 |
 |------|------|
@@ -107,9 +117,8 @@ Trot 对角配对：FL+RR 同相，FR+RL 同相（phase_offset 0 / 0.5）。
 ## 配置
 
 - `config/robot.yaml` — Go1 参数、`stand_joint` PD、`attitude_assist` IMU 外环、`sim_timing` 控制/显示/打印频率
-- `config/gait_config/march.yaml` — 原地踏步步态
-- `config/gait_config/trot.yaml` — 行走 trot
-- `config/locomotion.yaml` — 键盘速度、Balance QP、WBC 增益
+- `config/gait_config/*.yaml` — 步态 + `control:` 控制器参数
+- `config/locomotion.yaml` — 全局 balance/wbc、键盘、mode 切换
 - `config/mpc.yaml` — MPC
 
 ## Go1 mesh（首次）
